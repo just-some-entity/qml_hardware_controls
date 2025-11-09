@@ -43,18 +43,18 @@ int BrightnessEntry::current() const
 
 void BrightnessEntry::current(const int value)
 {
-    _current = value;
+    _current = std::clamp(value, 0, _max);
     requestSync();
 }
 
 qreal BrightnessEntry::currentNormalized() const
 {
-    return _current / _max;
+    return static_cast<qreal>(_current) / _max;
 }
 
 void BrightnessEntry::currentNormalized(const qreal value)
 {
-    _current = static_cast<int>((std::min(value, 1.0) * _max) / _max);
+    _current = static_cast<int>(std::clamp(value, 0.0, 1.0) * _max);
     requestSync();
 }
 

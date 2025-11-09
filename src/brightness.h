@@ -20,7 +20,7 @@ class BrightnessEntry : public QObject
 
     Q_PROPERTY(QString id              READ id);
 
-    QML_UNCREATABLE("Haha only I get to create them lmao");
+    QML_UNCREATABLE("Only I get to create them lmao");
     QML_NAMED_ELEMENT(BrightnessEntryBase);
 
     friend class Brightness;
