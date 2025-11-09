@@ -1,22 +1,174 @@
 #include "brightness.h"
 
-#include <iostream>
 #include <qregularexpression.h>
+#include <QDateTime>
+
+#ifdef ENABLE_LOGIND
+# if defined(HAVE_LIBSYSTEMD)
+#  include <systemd/sd-bus.h>
+# elif defined(HAVE_LIBELOGIND)
+#  include <elogind/sd-bus.h>
+# elif defined(HAVE_BASU)
+#  include <basu/sd-bus.h>
+# else
+#  error "No dbus provider found"
+# endif
+#endif
 
 static const QRegularExpression regex("^/sys/class/([^/]+)/([^/]+)/brightness$");
 
+static constexpr auto basePath       = "/sys/class/";
+static constexpr auto backlightClass = "backlight";
+static constexpr auto ledClass       = "leds";
+
+BrightnessEntry::BrightnessEntry(
+    QObject* parent,
+    const Class clazz,
+    const Id_t& id,
+    const int current,
+    const int max,
+    const QString& path_current)
+: QObject(parent)
+, _class(clazz)
+, _id(id)
+, _current(current)
+, _max(max)
+, _pathCurrent(path_current)
+{}
+
+int BrightnessEntry::current() const
+{
+    return _current;
+}
+
+void BrightnessEntry::current(const int value)
+{
+    _current = value;
+    requestSync();
+}
+
+qreal BrightnessEntry::currentNormalized() const
+{
+    return _current / _max;
+}
+
+void BrightnessEntry::currentNormalized(const qreal value)
+{
+    _current = static_cast<int>((std::min(value, 1.0) * _max) / _max);
+    requestSync();
+}
+
+int BrightnessEntry::max() const
+{
+    return _max;
+}
+
+BrightnessEntry::Class BrightnessEntry::clazz() const
+{
+    return _class;
+}
+
+const QString& BrightnessEntry::id() const
+{
+    return _id;
+}
+
+const QString& BrightnessEntry::pathCurrent() const
+{
+    return _pathCurrent;
+}
+
+QString BrightnessEntry::classAsString(const Class clazz)
+{
+    return clazz == Class::Backlight ? backlightClass : ledClass;
+}
+
+void BrightnessEntry::requestSync()
+{
+    qInfo() << "Updating Brightness! ";
+
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    auto& [timeoutUntil, queuedValue, timer] = _sync;
+
+    if (timer || now > timeoutUntil) // Can write now
+    {
+        writeChanges();
+        timeoutUntil = now + _updateDelay;
+    }
+
+    else // Not ready yet
+    {
+        // Timer already running, just update the value it will apply
+        if (timer)
+        {
+            queuedValue = _current;
+            return;
+        }
+
+        timer = new QTimer(this);
+        timer->setSingleShot(true);
+
+        connect(timer, &QTimer::timeout, this, [this]
+        {
+            _current = _sync.queuedValue;
+            writeChanges();
+            _sync.timer->deleteLater();
+        });
+    }
+}
+
+void BrightnessEntry::writeChanges()
+{
+#ifdef ENABLE_LOGIND
+    sd_bus* bus = nullptr;
+    int r = sd_bus_default_system(&bus);
+    if (r < 0)
+        qWarning() << "Can't connect to system bus:" << strerror(-r);
+
+    r = sd_bus_call_method(bus,
+                           "org.freedesktop.login1",
+                           "/org/freedesktop/login1/session/auto",
+                           "org.freedesktop.login1.Session",
+                           "SetBrightness",
+                           nullptr,
+                           nullptr,
+                           "ssu",
+                           classAsString(_class).toUtf8().constData(),
+                           _id.toUtf8().constData(),
+                           _current);
+
+    if (r < 0)
+        qWarning() << "Failed to set brightness: " << strerror(-r);
+
+    sd_bus_unref(bus);
+#else
+    if (QFile file(_pathCurrent); file.open(QIODevice::WriteOnly))
+    {
+        file.write(QByteArray::number(_current));
+        file.flush();
+        file.close();
+    }
+
+    else
+        qWarning() << "Failed to set brightness: " << file.errorString();
+#endif
+}
+
+
 Brightness::Brightness(QObject* parent)
 : QObject(parent)
-, _backlights(parseDir(QDir("/sys/class/backlight")))
-, _leds(parseDir(QDir("/sys/class/leds")))
+, _backlights(parseClass(this, BrightnessEntry::Class::Backlight))
+, _leds(parseClass(this, BrightnessEntry::Class::Led))
 {
     for (const auto& entry : _backlights)
-        _watcher.addPath(entry.pathCurrent);
+        _watcher.addPath(entry->pathCurrent());
     for (const auto& entry : _leds)
-        _watcher.addPath(entry.pathCurrent);
+        _watcher.addPath(entry->pathCurrent());
 
     connect(&_watcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& path)
     {
+        qInfo() << "File changed" << path;
+
         if (QFile f(path); f.open(QIODevice::ReadOnly))
         {
             const int newVal = f.readAll().trimmed().toInt();
@@ -24,13 +176,15 @@ Brightness::Brightness(QObject* parent)
 
             if (const QRegularExpressionMatch match = regex.match(path); match.hasMatch())
             {
-                const QString className = match.captured(1);  // backlight or leds
-                const QString deviceName = match.captured(2); // intel_backlight, etc.
+                const QString className  = match.captured(1);  // backlight or leds
+                const QString id         = match.captured(2);  // intel_backlight, etc.
 
-                if (className == "backlight")
-                    _backlights[deviceName].current = newVal;
-                else if (className == "leds")
-                    _leds[deviceName].current = newVal;
+                if (className != backlightClass && className != ledClass) return;
+
+                QList<BrightnessEntry*> entries = className == backlightClass ? _backlights : _leds;
+                for (const auto& backlight : entries)
+                    if (backlight->id() == id)
+                        backlight->_current = newVal;
             }
         }
 
@@ -41,97 +195,95 @@ Brightness::Brightness(QObject* parent)
     });
 }
 
-qreal Brightness::brightnessAbsolute()
+int Brightness::updateDelay() const
 {
-    if (_backlights.isEmpty()) return 0.0;
-    return _backlights.first().current;
+    return _updateDelay;
 }
 
-void Brightness::brightnessAbsolute(const qreal value)
+void Brightness::updateDelay(const int value)
 {
-    if (_backlights.isEmpty())
+    _updateDelay = value;
+
+    for (const auto backlight : _backlights)
+        backlight->_updateDelay = value;
+
+    for (const auto backlight : _leds)
+        backlight->_updateDelay = value;
+}
+
+// Backlight defaults
+int Brightness::backlight() const
+{
+    if (_backlights.empty())
     {
-        qWarning("Failed to set backlight brightness. No devices found");
+        qWarning() << "No Backlights found on system";
+        return 0;
+    }
+
+    return _backlights.first()->current();
+}
+
+void Brightness::backlight(const int value)
+{
+    if (_backlights.empty())
+    {
+        qWarning() << "No Backlights found on system";
         return;
     }
 
-    auto& entry = _backlights.first();
-    entry.current = static_cast<int>(value);
-    setBrightness("backlight", entry.device, entry.current);
+    _backlights.first()->current(value);
 }
 
-qreal Brightness::brightnessPercent()
+qreal Brightness::backlightNormalized() const
 {
-    if (_backlights.isEmpty()) return 0;
-    return static_cast<qreal>(_backlights.first().current) / _backlights.first().max;
-}
-
-void Brightness::brightnessPercent(const qreal value)
-{
-    if (_backlights.isEmpty())
+    if (_backlights.empty())
     {
-        qWarning("Failed to set backlight brightness. No devices found");
+        qWarning() << "No Backlights found on system";
+        return 0;
+    }
+
+    return _backlights.first()->currentNormalized();
+}
+
+void Brightness::backlightNormalized(const qreal value)
+{
+    if (_backlights.empty())
+    {
+        qWarning() << "No Backlights found on system";
         return;
     }
 
-    auto& entry = _backlights.first();
-    entry.current = static_cast<int>((value / 100.0) * entry.max);
-    setBrightness("backlight", entry.device, entry.current);
+    return _backlights.first()->currentNormalized(value);
 }
 
-qreal Brightness::brightnessMax()
+int Brightness::backlightMax() const
 {
-    if (_backlights.isEmpty()) return 0.0;
-    return _backlights.first().max;
-}
-
-qreal Brightness::brightnessLedAbsolute()
-{
-    if (_leds.isEmpty()) return 0.0;
-    return _leds.first().current;
-}
-
-void Brightness::brightnessLedAbsolute(const qreal value)
-{
-    if (_leds.isEmpty())
+    if (_backlights.empty())
     {
-        qWarning("Failed to set led brightness. No devices found");
-        return;
+        qWarning() << "No Backlights found on system";
+        return 0;
     }
 
-    auto& entry = _leds.first();
-    entry.current = static_cast<int>(value);
-    setBrightness("backlight", entry.device, entry.current);
+    return _backlights.first()->max();
 }
 
-qreal Brightness::brightnessLedPercent()
+QList<BrightnessEntry*> Brightness::backlights()
 {
-    if (_leds.isEmpty()) return 0;
-    return static_cast<qreal>(_leds.first().current) / _leds.first().max;
+    return _backlights;
 }
 
-void Brightness::brightnessLedPercent(const qreal value)
+QList<BrightnessEntry*> Brightness::leds()
 {
-    if (_leds.isEmpty())
-    {
-        qWarning("Failed to set led brightness. No devices found");
-        return;
-    }
-
-    auto& entry = _leds.first();
-    entry.current = static_cast<int>((value / 100) * entry.max);
-    setBrightness("backlight", entry.device, entry.current / entry.max);
+    return _leds;
 }
 
-qreal Brightness::brightnessLedMax()
+QList<BrightnessEntry*> Brightness::parseClass(Brightness* thiz, const BrightnessEntry::Class clazz)
 {
-    if (_leds.isEmpty()) return 0.0;
-    return _leds.first().max;
-}
+    QList<BrightnessEntry*> controllers;
 
-QMap<QString, Brightness::Entry> Brightness::parseDir(const QDir& dir)
-{
-    QMap<QString, Entry> controllers;
+    const QString classStr = BrightnessEntry::classAsString(clazz);
+
+    const QDir dir(basePath + classStr);
 
     for (const QFileInfo& fileInfo : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))
     {
@@ -144,61 +296,29 @@ QMap<QString, Brightness::Entry> Brightness::parseDir(const QDir& dir)
         if (!fBrightness.open(QIODevice::ReadOnly))
             continue;
 
-        QByteArray bData = fBrightness.readAll();
+        QByteArray currentData = fBrightness.readAll();
         fBrightness.close();
 
         if (!fBrightnessMax.open(QIODevice::ReadOnly))
             continue;
 
-        QByteArray mData = fBrightnessMax.readAll();
+        QByteArray maxData = fBrightnessMax.readAll();
         fBrightnessMax.close();
 
-        Entry entry {
-            bData.trimmed().toInt(),
-            mData.trimmed().toInt(),
-            pathB,
-            pathM
-        };
+        const auto id = fileInfo.fileName();
 
-        controllers.insert(fileInfo.fileName(), entry);
+        // Qt Manages lifetime so *should* not be a memory leak
+        // ReSharper disable once CppDFAMemoryLeak
+        const auto entry = new BrightnessEntry(
+            thiz,
+            clazz,
+            id,
+            currentData.trimmed().toInt(),
+            maxData.trimmed().toInt(),
+        pathB);
+
+        controllers.push_back(entry);
     }
 
     return controllers;
-}
-
-void Brightness::setBrightness(const QString& clazz, const QString& device, const int value)
-{
-    constexpr int delay = 50;
-
-    const QString path = QString("/sys/class/%1/%2/brightness").arg(clazz, device);
-
-    if (_pendingWrites.contains(path))
-        _pendingWrites[path].second->stop();
-    else
-    {
-        auto timer = new QTimer(this);
-        timer->setSingleShot(true);
-        connect(timer, &QTimer::timeout, this, [this, path]
-        {
-            if (_pendingWrites.contains(path))
-            {
-                const int val = _pendingWrites[path].first;
-
-                if (QFile file(path); file.open(QIODevice::WriteOnly))
-                {
-                    file.write(QByteArray::number(val));
-                    file.flush();
-                    file.close();
-                }
-
-                _pendingWrites[path].second->deleteLater();
-                _pendingWrites.remove(path);
-            }
-        });
-
-        _pendingWrites[path] = qMakePair(value, timer);
-    }
-
-    _pendingWrites[path].first = value;
-    _pendingWrites[path].second->start(delay);
 }

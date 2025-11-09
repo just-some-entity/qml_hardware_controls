@@ -1,7 +1,7 @@
 # https://github.com/caelestia-dots/shell/blob/main/plugin/src/Caelestia/CMakeLists.txt
 # Thanks ~~andrew~~ (Soramane)
 function(qml_module arg_TARGET)
-    cmake_parse_arguments(PARSE_ARGV 1 arg "" "URI" "SOURCES;LIBRARIES")
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "URI" "SOURCES;LIBRARIES;INCLUDES;CFLAGS")
 
     qt_add_qml_module(${arg_TARGET}
             URI ${arg_URI}
@@ -29,5 +29,9 @@ function(qml_module arg_TARGET)
     install(FILES "${module_qmldir}"   DESTINATION "${module_dir}")
     install(FILES "${module_typeinfo}" DESTINATION "${module_dir}")
 
+    message(STATUS "Includes ${arg_INCLUDES} libraries, ${arg_LIBRARIES}")
+
+    target_include_directories(${arg_TARGET} PRIVATE ${arg_INCLUDES})
     target_link_libraries(${arg_TARGET} PRIVATE Qt6::Core Qt6::Qml ${arg_LIBRARIES})
+    target_compile_options(${arg_TARGET} PRIVATE ${arg_CFLAGS})
 endfunction()

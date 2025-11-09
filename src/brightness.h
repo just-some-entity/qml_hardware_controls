@@ -8,18 +8,90 @@
 #include <qqmlintegration.h>
 #include <qiodevice.h>
 #include <qtimer.h>
+#include <QAbstractItemModel>
+
+class BrightnessEntry : public QObject
+{
+    Q_OBJECT;
+
+    Q_PROPERTY(qreal current           READ current           WRITE current);
+    Q_PROPERTY(qreal currentNormalized READ currentNormalized WRITE currentNormalized);
+    Q_PROPERTY(qreal max               READ max);
+
+    Q_PROPERTY(QString id              READ id);
+
+    QML_UNCREATABLE("Haha only I get to create them lmao");
+    QML_NAMED_ELEMENT(BrightnessEntryBase);
+
+    friend class Brightness;
+
+public:
+    using Id_t = QString;
+
+    enum class Class
+    {
+        Backlight,
+        Led
+    };
+
+    BrightnessEntry(
+        QObject* parent,
+        Class clazz,
+        const Id_t& id,
+        int current,
+        int max,
+        const QString& path_current);
+
+    // Backlight defaults
+    [[nodiscard]] int current() const;
+    void current(int value);
+
+    [[nodiscard]] qreal currentNormalized() const;
+    void currentNormalized(qreal value);
+
+    [[nodiscard]] int max() const;
+
+    Class clazz() const;
+    const QString& id() const;
+    const QString& pathCurrent() const;
+
+    static QString classAsString(Class clazz);
+
+private:
+    struct Sync
+    {
+        qsizetype timeoutUntil = 0;
+        int queuedValue = 0;
+        QTimer* timer = nullptr;
+    } _sync;
+
+    Class _class;
+    Id_t _id;
+
+    int _current;
+    int _max;
+
+    QString _pathCurrent;
+
+    int _updateDelay = 50;
+
+    void requestSync();
+
+    void writeChanges();
+};
 
 class Brightness : public QObject
 {
     Q_OBJECT;
 
-    Q_PROPERTY(qreal backlightAbsolute READ brightnessAbsolute WRITE brightnessAbsolute NOTIFY brightnessChanged)
-    Q_PROPERTY(qreal backlightPercent READ brightnessPercent WRITE brightnessPercent NOTIFY brightnessChanged)
-    Q_PROPERTY(qreal backlightMax READ brightnessMax)
+    Q_PROPERTY(int updateDelay READ updateDelay WRITE updateDelay)
 
-    Q_PROPERTY(qreal ledAbsolute READ brightnessLedAbsolute WRITE brightnessLedAbsolute NOTIFY brightnessLedChanged)
-    Q_PROPERTY(qreal ledPercent READ brightnessLedPercent WRITE brightnessLedPercent NOTIFY brightnessLedChanged)
-    Q_PROPERTY(qreal ledMax READ brightnessLedMax)
+    Q_PROPERTY(qreal backlight           READ backlight           WRITE backlight)
+    Q_PROPERTY(qreal backlightNormalized READ backlightNormalized WRITE backlightNormalized)
+    Q_PROPERTY(qreal backlightMax        READ backlightMax)
+
+    Q_PROPERTY(QList<BrightnessEntry*> backlights READ backlights)
+    Q_PROPERTY(QList<BrightnessEntry*> leds       READ leds)
 
     QML_SINGLETON
     QML_NAMED_ELEMENT(BrightnessController);
@@ -27,45 +99,26 @@ class Brightness : public QObject
 public:
     explicit Brightness(QObject* parent = nullptr);
 
-    [[nodiscard]] qreal brightnessAbsolute();
-    void brightnessAbsolute(qreal value);
+    [[nodiscard]] int updateDelay() const;
+    void updateDelay(int value);
 
-    [[nodiscard]] qreal brightnessPercent();
-    void brightnessPercent(qreal value);
+    [[nodiscard]] int backlight() const;
+    void backlight(int value);
 
-    [[nodiscard]] qreal brightnessMax();
+    [[nodiscard]] qreal backlightNormalized() const;
+    void backlightNormalized(qreal value);
 
-    [[nodiscard]] qreal brightnessLedAbsolute();
-    void brightnessLedAbsolute(qreal value);
+    [[nodiscard]] int backlightMax() const;
 
-    [[nodiscard]] qreal brightnessLedPercent();
-    void brightnessLedPercent(qreal value);
-
-    [[nodiscard]] qreal brightnessLedMax();
-
-signals:
-    void brightnessChanged();
-    void brightnessLedChanged();
+    [[nodiscard]] QList<BrightnessEntry*> backlights();
+    [[nodiscard]] QList<BrightnessEntry*> leds();
 
 private:
-    struct Entry
-    {
-        int current;
-        int max;
+    static QList<BrightnessEntry*> parseClass(Brightness* thiz, BrightnessEntry::Class clazz);
 
-        QString device;
-
-        QString pathCurrent;
-        QString pathMax;
-    };
-
-    static QMap<QString, Entry> parseDir(const QDir& dir);
-
+    int _updateDelay = 50;
     QFileSystemWatcher _watcher;
-    QMap<QString, Entry> _backlights;
-    QMap<QString, Entry> _leds;
 
-    QMap<QString, QPair<int, QTimer*>> _pendingWrites;
-
-    void setBrightness(const QString& clazz, const QString& device, int value);
+    QList<BrightnessEntry*> _backlights;
+    QList<BrightnessEntry*> _leds;
 };
