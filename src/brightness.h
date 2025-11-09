@@ -67,40 +67,5 @@ private:
 
     QMap<QString, QPair<int, QTimer*>> _pendingWrites;
 
-    void setBrightness(QString clazz, QString device, const int value)
-    {
-        constexpr int delay = 50;
-
-        const QString path = QString("/sys/class/%1/%2/brightness").arg(clazz, device);
-
-        if (_pendingWrites.contains(path))
-            _pendingWrites[path].second->stop();
-        else
-        {
-            auto timer = new QTimer(this);
-            timer->setSingleShot(true);
-            connect(timer, &QTimer::timeout, this, [this, path]
-            {
-                if (_pendingWrites.contains(path))
-                {
-                    const int val = _pendingWrites[path].first;
-
-                    if (QFile file(path); file.open(QIODevice::WriteOnly))
-                    {
-                        file.write(QByteArray::number(val));
-                        file.flush();
-                        file.close();
-                    }
-
-                    _pendingWrites[path].second->deleteLater();
-                    _pendingWrites.remove(path);
-                }
-            });
-
-            _pendingWrites[path] = qMakePair(value, timer);
-        }
-
-        _pendingWrites[path].first = value;
-        _pendingWrites[path].second->start(delay);
-    }
+    void setBrightness(QString clazz, QString device, int value);
 };
