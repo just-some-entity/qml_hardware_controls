@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
+# go to the directory of the script to avoid accidental build in wrong dir
+cd "$(dirname "$0")"
+
 # Create build directory
 mkdir -p build
 cd build
