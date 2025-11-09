@@ -9,9 +9,15 @@ Window
 
     visible: true
 
+    Text {
+        text: "backlight level:" + BrightnessController.backlight
+    }
+
     Component.onCompleted: {
 
-        for (const led of BrightnessController.leds)
+        console.log("backlights");
+        console.log("----------");
+        for (const backlight of BrightnessController.backlights)
         {
             console.log(led.id);
             console.log(led.current);
@@ -19,6 +25,16 @@ Window
             console.log("");
         }
 
-        // console.log(BrightnessController.backlight, BrightnessController.backlightMax);
+        console.log("leds");
+        console.log("----------");
+        for (const led of BrightnessController.leds)
+        {
+            console.log(led.id);
+            console.log(led.current);
+            console.log(led.max);
+            console.log("");
+
+            led.current = 10;
+        }
     }
 }
