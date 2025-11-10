@@ -73,8 +73,18 @@ A Qt/QML module to monitor and control hardware on Linux.
 import HardwareControls
  
  ...
+CpuDataSampler
+{
+    id: cpuData
+}
+
+Text
+{
+    text: "cpu-name: " + cpuData.name + " : " + cpuData.utilization
+}
+
 Text {
-    text: "backlight level:" + BrightnessController.backlight
+    text: "cpu utilization:" + BrightnessController.backlight
 }
 
 Component.onCompleted: {

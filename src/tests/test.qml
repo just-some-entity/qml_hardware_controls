@@ -14,16 +14,6 @@ Window
     CpuDataSampler
     {
         id: cpuData
-
-        onFrequencyChanged: {
-            for (let key in cpuData) {
-                if (cpuData.hasOwnProperty(key)) {
-                    console.log(key + ": " + cpuData[key]);
-                }
-            }
-
-            console.log("--------------------------------------------");
-        }
     }
 
     Text
