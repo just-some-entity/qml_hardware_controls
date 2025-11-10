@@ -15,6 +15,8 @@
 # endif
 #endif
 
+namespace hw_monitor
+{
 static const QRegularExpression regex("^/sys/class/([^/]+)/([^/]+)/brightness$");
 
 static constexpr auto basePath       = "/sys/class/";
@@ -185,8 +187,8 @@ Brightness::Brightness(QObject* parent)
         }
 
         /// As a safety measure, many applications save an open
-        /// file by writing a new file and then deleting the old one.
-        /// So if it's missing add it back
+            /// file by writing a new file and then deleting the old one.
+            /// So if it's missing add it back
         _watcher.addPath(path);
     });
 }
@@ -317,4 +319,5 @@ QList<BrightnessEntry*> Brightness::parseClass(Brightness* thiz, const Brightnes
     }
 
     return controllers;
+}
 }

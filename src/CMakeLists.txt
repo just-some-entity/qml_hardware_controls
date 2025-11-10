@@ -3,7 +3,11 @@ qml_module(qml_hardware_controls
             HardwareControls
 
         SOURCES
+            hardware_manager.cpp
             brightness.cpp
+            cpu/sampler.cpp
+            collection/cpu_collector.cpp
+
 
         LIBRARIES
             Qt6::Core
@@ -17,4 +21,5 @@ qml_module(qml_hardware_controls
             ${LOGIND_COMPAT_CFLAGS_OTHER}
 )
 
+add_subdirectory(daemon)
 add_subdirectory(tests)

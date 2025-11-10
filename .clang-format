@@ -1,0 +1,8 @@
+BasedOnStyle: LLVM
+NamespaceIndentation: None
+IndentWidth: 4
+
+BraceWrapping:
+  AfterNamespace: true      # adds a line break after namespace {
+  BeforeNamespace: true     # adds a line break before closing }
+  AfterControlStatement: true

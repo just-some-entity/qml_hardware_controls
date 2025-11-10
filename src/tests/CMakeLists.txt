@@ -1,13 +1,16 @@
-qt_add_executable(brightness_test
+qt_add_executable(the_test
+        the_test.cpp
         ../brightness.cpp
-        brightness_test.cpp)
+        ../collection/cpu_collector.cpp
+        ../cpu/sampler.cpp
+        ../hardware_manager.cpp)
 
-qt_add_resources(brightness_test "test_resources"
-        PREFIX "/tests/brightness"
+qt_add_resources(the_test "test_resources"
+        PREFIX "/tests/primary"
         FILES
             test.qml
 )
 
-target_include_directories(brightness_test PRIVATE ${LOGIND_COMPAT_INCLUDE_DIRS})
-target_link_libraries(brightness_test PRIVATE Qt6::Quick Qt6::Gui Qt::Core Qt::Qml ${LOGIND_COMPAT_LIBRARIES})
-target_compile_options(brightness_test PRIVATE ${LOGIND_COMPAT_CFLAGS_OTHER})
+target_include_directories(the_test PRIVATE ${LOGIND_COMPAT_INCLUDE_DIRS})
+target_link_libraries(the_test PRIVATE Qt6::Quick Qt6::Gui Qt::Core Qt::Qml ${LOGIND_COMPAT_LIBRARIES})
+target_compile_options(the_test PRIVATE ${LOGIND_COMPAT_CFLAGS_OTHER})

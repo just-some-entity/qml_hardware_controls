@@ -1,20 +1,55 @@
 import QtQuick
+import QtQuick.Layouts
 
-import BrightnessControllerP
+import HardwareManager
 
 Window
 {
+    id: win
     width:  400
     height: 400
 
     visible: true
 
-    Text {
-        text: "backlight level:" + BrightnessController.backlight
+    Column
+    {
+        anchors.fill: parent
+
+        Repeater
+        {
+            model: CpuMonitor.cpus
+            delegate: Rectangle {
+
+                width:  win.width
+                height: win.height
+
+                Column
+                {
+                    anchors.fill: parent
+
+                    Repeater
+                    {
+                        model: modelData.cores
+
+                        delegate: Rectangle {
+
+                            width:  win.width
+                            height: 60
+
+                            Text
+                            {
+                                text: "core-frequency: " + modelData.frequencyMin + " : " + modelData.frequencyMax + " : " + modelData.frequencyCurrent
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Component.onCompleted: {
 
+        /*
         console.log("backlights");
         console.log("----------");
         for (const backlight of BrightnessController.backlights)
@@ -36,5 +71,6 @@ Window
 
             led.current = 10;
         }
+        */
     }
 }
