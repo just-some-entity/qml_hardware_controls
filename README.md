@@ -51,10 +51,10 @@ A Qt/QML module to monitor and control hardware on Linux.
 | `load1`        | `qreal`  | Read-only  | System load average over 1 minute.                                    |
 | `load5`        | `qreal`  | Read-only  | System load average over 5 minutes.                                   |
 | `load15`       | `qreal`  | Read-only  | System load average over 15 minutes.                                  |
-| `frequencyMin` | `qreal`  | Read-only  | First CPU's minimum frequency.                                        |
-| `frequencyMax` | `qreal`  | Read-only  | First CPU's maximum frequency.                                        |
-| `frequency`    | `qreal`  | Read-only  | Current CPU frequency.                                                |
-| `temperature`  | `qreal`  | Read-only  | Current CPU temperature.                                              |
+| `frequencyMin` | `qreal`  | Read-only  | First CPU's minimum frequency in MHz.                                 |
+| `frequencyMax` | `qreal`  | Read-only  | First CPU's maximum frequency in MHz.                                 |
+| `frequency`    | `qreal`  | Read-only  | Current CPU average frequency in MHz.                                 |
+| `temperature`  | `qreal`  | Read-only  | Current CPU average temperature in °C.                                |
 | `utilization`  | `qreal`  | Read-only  | CPU utilization ratio (0–1).                                          |
 | `powerDraw`    | `qreal`  | Read-only  | Estimated CPU power draw in watts.                                    |
 | `maxSamples`   | `int`    | Read/Write | Max number of data samples to collect                                 |

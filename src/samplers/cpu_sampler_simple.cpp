@@ -96,11 +96,11 @@ const SimpleCpuDataSnapshot& SimpleCpuDataSnapshotModel::appendSnapshot(
 SimpleCpuDataEntryBase::SimpleCpuDataEntryBase(QObject* parent)
 : QObject(parent) {}
 
-qreal SimpleCpuDataEntryBase::frequencyMin() const { return  _freqMin; }
-qreal SimpleCpuDataEntryBase::frequencyMax() const { return  _freqMax; }
+qreal SimpleCpuDataEntryBase::frequencyMin() const { return  _freqMin / 1000; }
+qreal SimpleCpuDataEntryBase::frequencyMax() const { return  _freqMax / 1000; }
 qreal SimpleCpuDataEntryBase::frequency()    const
 {
-    return _latestSnapshot ? _latestSnapshot->freq : 0.0;
+    return _latestSnapshot ? _latestSnapshot->freq / 1000: 0.0;
 }
 qreal SimpleCpuDataEntryBase::temperature() const
 {
@@ -207,7 +207,7 @@ void SimpleCpuDataSampler::sample(const Data_Cpu& data)
         ++i;
     }
 
-    cpuData.freqNow = (accFreq / i) / 1000;
+    cpuData.freqNow = (accFreq / i);
     cpuData.temp    = accTemp / i ;
 
     importData(cpuData, cpuData.draw);
