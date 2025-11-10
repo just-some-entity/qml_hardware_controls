@@ -5,11 +5,12 @@ A Qt/QML module to monitor and control hardware on Linux.
 ## Current Features
 
 - Detects available **backlight** and **LED devices** under `/sys/class/backlight` and `/sys/class/leds`, and allows writing to them.
+- Monitors and exposes **CPU statistics** by reading from `/proc/stat`, `/proc/cpuinfo` ,`/sys/devices/system/cpu/` and `/proc/loadavg`,
 
 ## Planned Features
 
 - Memory Stats
-- CPU Usage and Temperature Monitoring
+- Temperature Monitoring for Cpus
 - System Uptime and Load Average
 - Network Information (Wi-Fi, Ethernet, Signal Strength)
 - Battery and Power Management
@@ -20,7 +21,6 @@ A Qt/QML module to monitor and control hardware on Linux.
 - Display Configuration and Brightness Profiles (Maybe)
 
 ## Currently Available Interfaces
-
 
 ### BrightnessController
 | Property | Type | Access | Description |
@@ -42,6 +42,30 @@ A Qt/QML module to monitor and control hardware on Linux.
 | `max` | `qreal` | Read-only | Maximum brightness value supported by the device. |
 | `id` | `QString` | Read-only | Unique identifier of the device. |
 
+
+### CpuDataSampler (For simple monitoring tools)
+
+| Property | Type | Access | Description                                                                               |
+|-----------|------|---------|-------------------------------------------------------------------------------------------|
+| `name` | `string` | Read-only | Name of the CPU (e.g., `"Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"`). |
+| `load1` | `qreal` | Read-only | System load average over 1 minute.                                                        |
+| `load5` | `qreal` | Read-only | System load average over 5 minutes.                                                       |
+| `load15` | `qreal` | Read-only | System load average over 15 minutes.                                                      |
+| `frequencyMin` | `qreal` | Read-only | First CPU's minimum frequency.                                                            |
+| `frequencyMax` | `qreal` | Read-only | First CPU's maximum frequency.                                                            |
+| `frequency` | `qreal` | Read-only | Current CPU frequency.                                                                    |
+| `temperature` | `qreal` | Read-only | Current CPU temperature.                                                                  |
+| `utilization` | `qreal` | Read-only | CPU utilization ratio (0–1).                                                              |
+| `powerDraw` | `qreal` | Read-only | Estimated CPU power draw in watts.                                                        |
+
+### CpuDataSnapshotModel Properties
+
+| Role | Type | Description |
+|------|------|-------------|
+| `Temperature` | `qreal` | Snapshot temperature value. |
+| `Frequency` | `qreal` | Snapshot frequency value. |
+| `Utilization` | `qreal` | Snapshot CPU utilization ratio. |
+| `PowerDraw` | `qreal` | Snapshot estimated power draw. |
 
 ## Example Usage
 

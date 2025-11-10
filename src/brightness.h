@@ -10,6 +10,8 @@
 #include <qtimer.h>
 #include <QAbstractItemModel>
 
+namespace hw_monitor {
+
 class BrightnessEntry : public QObject
 {
     Q_OBJECT;
@@ -122,3 +124,4 @@ private:
     QList<BrightnessEntry*> _backlights;
     QList<BrightnessEntry*> _leds;
 };
+}

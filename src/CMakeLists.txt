@@ -3,7 +3,12 @@ qml_module(qml_hardware_controls
             HardwareControls
 
         SOURCES
+            hardware_manager.cpp
             brightness.cpp
+            collection/cpu_collector.cpp
+
+            samplers/cpu_sampler_simple.h
+            samplers/cpu_sampler_simple.cpp
 
         LIBRARIES
             Qt6::Core
@@ -12,6 +17,7 @@ qml_module(qml_hardware_controls
 
         INCLUDES
             ${LOGIND_COMPAT_INCLUDE_DIRS}
+            ${CMAKE_CURRENT_SOURCE_DIR}/samplers
 
         CFLAGS
             ${LOGIND_COMPAT_CFLAGS_OTHER}

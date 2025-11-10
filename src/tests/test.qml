@@ -1,40 +1,33 @@
 import QtQuick
+import QtQuick.Layouts
 
-import BrightnessControllerP
+import HardwareManager
 
 Window
 {
+    id: win
     width:  400
     height: 400
 
     visible: true
 
-    Text {
-        text: "backlight level:" + BrightnessController.backlight
+    CpuDataSampler
+    {
+        id: cpuData
+
+        onFrequencyChanged: {
+            for (let key in cpuData) {
+                if (cpuData.hasOwnProperty(key)) {
+                    console.log(key + ": " + cpuData[key]);
+                }
+            }
+
+            console.log("--------------------------------------------");
+        }
     }
 
-    Component.onCompleted: {
-
-        console.log("backlights");
-        console.log("----------");
-        for (const backlight of BrightnessController.backlights)
-        {
-            console.log(led.id);
-            console.log(led.current);
-            console.log(led.max);
-            console.log("");
-        }
-
-        console.log("leds");
-        console.log("----------");
-        for (const led of BrightnessController.leds)
-        {
-            console.log(led.id);
-            console.log(led.current);
-            console.log(led.max);
-            console.log("");
-
-            led.current = 10;
-        }
+    Text
+    {
+        text: "cpu-name: " + cpuData.name + " : " + cpuData.utilization
     }
 }
