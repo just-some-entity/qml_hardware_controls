@@ -3,7 +3,6 @@ qt_add_executable(the_test
         ../brightness.cpp
         ../hardware_manager.cpp
         ../collection/cpu_collector.cpp
-
         ../samplers/cpu_sampler_simple.cpp
 )
 

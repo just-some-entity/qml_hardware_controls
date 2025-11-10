@@ -159,7 +159,6 @@ void readFreqMinMax(Data_Cpu& data, const Mappings_t& mappings)
     const QDir cpuDir("/sys/devices/system/cpu/");
     QStringList cpuDirs = cpuDir.entryList(QStringList() << "cpu[0-9]*", QDir::Dirs);
 
-    qsizetype i = 0;
     for (const QString& cpu : cpuDirs)
     {
         bool ok = false;
@@ -194,7 +193,7 @@ void readFreqMinMax(Data_Cpu& data, const Mappings_t& mappings)
             fNow.close();
         }
 
-        auto [cpuIndex, coreIndex] = mappings.at(i);
+        auto [cpuIndex, coreIndex] = mappings.at(index);
         auto& core = data.cpus[cpuIndex].cores[coreIndex];
 
         core.freqMin = minFreq;

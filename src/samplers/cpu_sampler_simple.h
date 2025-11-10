@@ -5,7 +5,6 @@
 #include <qqmlparserstatus.h>
 #include <qtypes.h>
 
-#include "../util/i_sampler.h"
 #include "../collection/cpu_data.h"
 
 struct SimpleCpuDataSnapshot
@@ -99,15 +98,16 @@ class SimpleCpuDataSampler
     Q_PROPERTY(qreal load1  READ load1  NOTIFY dynamicChanged)
     Q_PROPERTY(qreal load5  READ load5  NOTIFY dynamicChanged)
     Q_PROPERTY(qreal load15 READ load15 NOTIFY dynamicChanged)
+    // Q_PROPERTY(QL<SimpleCpuDataCoreEntry*> cores READ cores NOTIFY staticChanged)
     Q_INTERFACES(QQmlParserStatus)
     QML_NAMED_ELEMENT(CpuDataSampler)
-
 
 public:
     [[nodiscard]] QString name()  const;
     [[nodiscard]] qreal load1()  const;
     [[nodiscard]] qreal load5()  const;
     [[nodiscard]] qreal load15() const;
+    [[nodiscard]] const QVector<SimpleCpuDataCoreEntry*>& cores() const;
 
     void sample(const Data_Cpu& data);
 

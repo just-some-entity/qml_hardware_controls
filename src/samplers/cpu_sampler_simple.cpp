@@ -1,4 +1,4 @@
-#include "i_sampler.h"
+#include "cpu_sampler_simple.h"
 
 #include <qqml.h>
 #include <qqmlengine.h>
@@ -168,8 +168,6 @@ qreal SimpleCpuDataSampler::load15() const
 
 void SimpleCpuDataSampler::sample(const Data_Cpu& data)
 {
-    qWarning() << "We samplin bois";
-
     _load1  = data.load1;
     _load5  = data.load5;
     _load15 = data.load15;
@@ -220,4 +218,9 @@ void SimpleCpuDataSampler::componentComplete()
         connect(
             singleton, &hw_monitor::HardwareManager::cpuDataChanged,
             this, &SimpleCpuDataSampler::sample);
+}
+
+const QVector<SimpleCpuDataCoreEntry*>& SimpleCpuDataSampler::cores() const
+{
+    return _cores;
 }
