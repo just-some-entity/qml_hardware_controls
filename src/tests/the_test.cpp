@@ -5,7 +5,7 @@
 #include "../brightness.h"
 #include "../hardware_manager.h"
 
-#include "../cpu/sampler.h"
+#include "../samplers/i_sampler.h"
 
 int main(int argc, char *argv[])
 {

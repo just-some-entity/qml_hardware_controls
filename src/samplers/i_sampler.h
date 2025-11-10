@@ -2,9 +2,10 @@
 
 #include <qabstractitemmodel.h>
 #include <qqmlintegration.h>
+#include <qqmlparserstatus.h>
 #include <qtypes.h>
 
-#include "../util/sampler.h"
+#include "../util/i_sampler.h"
 #include "../collection/cpu_data.h"
 
 struct SimpleCpuDataSnapshot
@@ -28,17 +29,17 @@ public:
         PowerDraw,
     };
 
-    QHash<int, QByteArray> roleNames() const override;
+    [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 
-    int rowCount(const QModelIndex& parent) const override;
-    QVariant data(const QModelIndex& index, int role) const override;
+    [[nodiscard]] int rowCount(const QModelIndex& parent) const override;
+    [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
     [[nodiscard]] qsizetype size() const;
     [[nodiscard]] qsizetype maxSize() const;
 
     void maxSize(qsizetype size);
 
-    const SimpleCpuDataSnapshot& snapshotAt(qsizetype row) const;
+    [[nodiscard]] const SimpleCpuDataSnapshot& snapshotAt(qsizetype row) const;
 
     const SimpleCpuDataSnapshot& appendSnapshot(const SimpleCpuDataSnapshot& s);
 
@@ -89,13 +90,18 @@ protected:
 
 using SimpleCpuDataCoreEntry = SimpleCpuDataEntryBase;
 
-class SimpleCpuDataSampler : public SimpleCpuDataEntryBase
+class SimpleCpuDataSampler
+    : public SimpleCpuDataEntryBase
+    , public QQmlParserStatus
 {
     Q_OBJECT
+    Q_PROPERTY(QString name READ name   NOTIFY staticChanged)
     Q_PROPERTY(qreal load1  READ load1  NOTIFY dynamicChanged)
     Q_PROPERTY(qreal load5  READ load5  NOTIFY dynamicChanged)
     Q_PROPERTY(qreal load15 READ load15 NOTIFY dynamicChanged)
+    Q_INTERFACES(QQmlParserStatus)
     QML_NAMED_ELEMENT(CpuDataSampler)
+
 
 public:
     [[nodiscard]] QString name()  const;
@@ -103,7 +109,10 @@ public:
     [[nodiscard]] qreal load5()  const;
     [[nodiscard]] qreal load15() const;
 
-    void sample(Data_Cpu& data);
+    void sample(const Data_Cpu& data);
+
+    void classBegin() override;
+    void componentComplete() override;
 
 private:
     QString _name = "N/A";

@@ -1,4 +1,9 @@
-#include "sampler.h"
+#include "i_sampler.h"
+
+#include <qqml.h>
+#include <qqmlengine.h>
+
+#include "../hardware_manager.h"
 
 QHash<int, QByteArray> SimpleCpuDataSnapshotModel::roleNames() const
 {
@@ -13,7 +18,7 @@ QHash<int, QByteArray> SimpleCpuDataSnapshotModel::roleNames() const
 int SimpleCpuDataSnapshotModel::rowCount(const QModelIndex& parent) const
 {
     Q_UNUSED(parent);
-    return _snapshots.size();
+    return static_cast<int>(_snapshots.size());
 }
 
 QVariant SimpleCpuDataSnapshotModel::data(const QModelIndex& index, int role) const
@@ -65,7 +70,7 @@ void SimpleCpuDataSnapshotModel::maxSize(const qsizetype size)
 const SimpleCpuDataSnapshot& SimpleCpuDataSnapshotModel::snapshotAt(const qsizetype row) const
 {
     if (row < 0 || row >= _snapshots.size())
-        throw "Index out of bounds.";
+        throw std::runtime_error("Index out of bounds.");
 
     return _snapshots.at(row);
 }
@@ -161,8 +166,10 @@ qreal SimpleCpuDataSampler::load15() const
     return _load15;
 }
 
-void SimpleCpuDataSampler::sample(Data_Cpu& data)
+void SimpleCpuDataSampler::sample(const Data_Cpu& data)
 {
+    qWarning() << "We samplin bois";
+
     _load1  = data.load1;
     _load5  = data.load5;
     _load15 = data.load15;
@@ -194,4 +201,23 @@ void SimpleCpuDataSampler::sample(Data_Cpu& data)
     }
 
     emit dynamicChanged();
+}
+
+void SimpleCpuDataSampler::classBegin()
+{
+
+}
+
+void SimpleCpuDataSampler::componentComplete()
+{
+    auto* engine = qmlEngine(this);
+    if (!engine)
+        return;
+
+    // works for singletons registered with qmlRegisterSingletonType or qmlRegisterSingletonInstance
+    auto* singleton = engine->singletonInstance<hw_monitor::HardwareManager*>("HardwareManager", "HardwareManager");
+    if (singleton)
+        connect(
+            singleton, &hw_monitor::HardwareManager::cpuDataChanged,
+            this, &SimpleCpuDataSampler::sample);
 }

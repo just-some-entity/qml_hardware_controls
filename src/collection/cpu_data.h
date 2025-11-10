@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QList>
+#include <QVariant>
 #include <qstring.h>
 #include <qtypes.h>
 
@@ -19,7 +19,7 @@ struct Data_Cpu
         quint64 guest      = 0; // running a virtual CPU
         quint64 guest_nice = 0; // guest time with low priority
 
-        quint64 total() const
+        [[nodiscard]] quint64 total() const
         {
             return nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
         }
@@ -38,7 +38,10 @@ struct Data_Cpu
         Stats stats;
     };
 
-    using CoreData = Entry;
+    struct CoreData : Entry
+    {
+        QVariantMap cpuInfoEntries;
+    };
 
     struct CpuData : Entry
     {
@@ -48,9 +51,26 @@ struct Data_Cpu
         QVector<CoreData> cores;
     };
 
+    struct StatsGlobal
+    {
+        Stats totalCpuStats;
+
+        QVector<quint64> interrupts;
+
+        quint64 contextSwitches = 0;
+        quint64 bootTime        = 0;
+        quint64 processes       = 0;
+        quint64 procsRunning    = 0;
+        quint64 procsBlocked    = 0;
+
+        QVector<quint64> softIrqs;
+    };
+
     float load1  = 0; // 1-minute load average
     float load5  = 0; // 5-minute load average
     float load15 = 0; // 15-minute load average
+
+    StatsGlobal globalStats;
 
     QVector<CpuData> cpus;
 };

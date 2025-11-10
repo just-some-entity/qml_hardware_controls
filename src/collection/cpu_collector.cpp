@@ -7,33 +7,30 @@
 
 #include "cpu_data.h"
 
-// Utilities for /proc/cpu_info
-struct CpuInfoEntry
-{
-    int processor;    // cpuX from /proc/stat
-    int physicalId;   // physical CPU/package
-    int coreId;       // core number in the CPU
+using Mappings_t = std::unordered_map<qsizetype, QPair<qsizetype, qsizetype>>;
 
-    QMap<QString, QVariant> rawPairs;
-};
-
-QVector<CpuInfoEntry> readCpuInfo(const FilterMode filterMode, const std::unordered_set<QString>& filter)
+// Returns a list of all cores, (not grouped by cpu, will do that later)
+Mappings_t readCpuInfo(const CpuCollector::Options& options, Data_Cpu& data)
 {
-    QVector<CpuInfoEntry> entries;
+    Mappings_t mappings{};
 
     QFile file("/proc/cpuinfo");
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         qWarning() << "Failed to open /proc/cpuinfo. CpuMonitor data will be incomplete";
-        return entries;
+        return mappings;
     }
 
-    CpuInfoEntry* currentEntry = nullptr;
+    // I assume that at least one cpu should be found
+    Data_Cpu::CpuData* currentCpu = &data.cpus.emplace_back();
+    std::unique_ptr<Data_Cpu::CoreData> currentCore = nullptr;
 
     const QRegularExpression re("^\\s*([^:]+)\\s*:\\s*(.+)$"); // key : value
 
     QString contents = file.readAll();
     QStringList lines = contents.split('\n', Qt::SkipEmptyParts);
+
+    qsizetype coreCount = 0;
 
     for (const auto& lineRaw : lines)
     {
@@ -50,53 +47,31 @@ QVector<CpuInfoEntry> readCpuInfo(const FilterMode filterMode, const std::unorde
 
         if (key == "processor")
         {
-            const auto val = value.toInt();
+            if (currentCore != nullptr)
+            {
+                if (currentCpu == nullptr) throw std::runtime_error("Failed to assign core to cpu. No cpu found?");
+                currentCpu->cores.push_back(*currentCore);
 
-            if (currentEntry == nullptr || currentEntry->processor != val)
-                currentEntry = &entries.emplace_back();
+                mappings.insert({coreCount++, { data.cpus.size() - 1, currentCpu->cores.size() - 1 }});
+            }
 
-            currentEntry->processor = val;
-            currentEntry->rawPairs.insert(key, value);
+            currentCore.reset(new Data_Cpu::CoreData);
         }
-        else if (currentEntry == nullptr)
-            throw "Error while reading /proc/cpuinfo, processor should be the first key, but it's not?";
-        else if (key == "physical id")
-        {
-            currentEntry->physicalId = value.toInt();
-            currentEntry->rawPairs.insert(key, value);
-        }
-        else if (key == "core id")
-        {
-            currentEntry->coreId = value.toInt();
-            currentEntry->rawPairs.insert(key, value);
-        }
+        else if (key == "physical id" && value.toInt() > data.cpus.size() - 1)
+            currentCpu = &data.cpus.emplace_back();
         else if (key == "model name")
-            currentEntry->rawPairs.insert(key, value);
-        else if (filterMode == FilterMode::Inclusive && filter.contains(key))
-            currentEntry->rawPairs.insert(key, value);
-        else if (filterMode == FilterMode::Exclusive && !filter.contains(key))
-            currentEntry->rawPairs.insert(key, value);
+            currentCpu->name = value;
+        if (options.filterMode == FilterMode::Inclusive && options.filter.contains(key))
+            currentCore->cpuInfoEntries.insert(key, value);
+        else if (options.filterMode == FilterMode::Exclusive && !options.filter.contains(key))
+            currentCore->cpuInfoEntries.insert(key, value);
     }
 
-    return entries;
+    currentCpu->cores.push_back(*currentCore);
+    mappings.insert({coreCount++, { data.cpus.size() - 1, currentCpu->cores.size() - 1 }});
+
+    return mappings;
 }
-
-//# Utils for /proc/stat
-struct StatData
-{
-    Data_Cpu::Stats totalCpuStats;
-    QVector<Data_Cpu::Stats> processorStats;
-
-    QVector<quint64> interrupts;
-
-    quint64 contextSwitches = 0;
-    quint64 bootTime        = 0;
-    quint64 processes       = 0;
-    quint64 procsRunning    = 0;
-    quint64 procsBlocked    = 0;
-
-    QVector<quint64> softIrqs;
-};
 
 void parseStatCpu(Data_Cpu::Stats& stats, const QStringList& parts)
 {
@@ -112,15 +87,13 @@ void parseStatCpu(Data_Cpu::Stats& stats, const QStringList& parts)
     stats.guest_nice = parts[10].toDouble();
 }
 
-StatData readStat()
+void readStat(Data_Cpu& data, const Mappings_t& mappings)
 {
-    StatData data{};
-
     QFile file("/proc/stat");
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         qWarning() << "Failed to open /proc/stat. CpuMonitor data will be incomplete";
-        return data;
+        return;
     }
 
     QString contents  = file.readAll();
@@ -134,34 +107,42 @@ StatData readStat()
         QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
 
         if (parts[0] == "cpu") // global cpu stats
-            parseStatCpu(data.totalCpuStats, parts);
+            parseStatCpu(data.globalStats.totalCpuStats, parts);
         else if (line.startsWith("cpu"))
-            parseStatCpu(data.processorStats.emplace_back(), parts);
+        {
+            bool ok = false;
+            const quint64 index = parts[0].mid(3).toULongLong(&ok);
+
+            if (!ok) throw std::runtime_error("Failed to parse cpu index");
+
+            auto [cpuIndex, coreIndex] = mappings.at(index);
+            auto& core = data.cpus[cpuIndex].cores[coreIndex];
+
+            parseStatCpu(core.stats, parts);
+        }
         else if (parts[0] == "intr") // interrupts
         {
-            data.interrupts.clear();
+            data.globalStats.interrupts.clear();
             for (int i = 1; i < parts.size(); ++i)
-                data.interrupts.push_back(parts[i].toULongLong());
+                data.globalStats.interrupts.push_back(parts[i].toULongLong());
         }
         else if (parts[0] == "ctxt") // context switches
-            data.contextSwitches = parts[1].toULongLong();
+            data.globalStats.contextSwitches = parts[1].toULongLong();
         else if (parts[0] == "btime") // boot time
-            data.bootTime = parts[1].toULongLong();
+            data.globalStats.bootTime = parts[1].toULongLong();
         else if (parts[0] == "processes") // total forks
-            data.processes = parts[1].toULongLong();
+            data.globalStats.processes = parts[1].toULongLong();
         else if (parts[0] == "procs_running")
-            data.procsRunning = parts[1].toULongLong();
+            data.globalStats.procsRunning = parts[1].toULongLong();
         else if (parts[0] == "procs_blocked")
-            data.procsBlocked = parts[1].toULongLong();
+            data.globalStats.procsBlocked = parts[1].toULongLong();
         else if (parts[0] == "softirq")
         {
-            data.softIrqs.clear();
+            data.globalStats.softIrqs.clear();
             for (int i = 1; i < parts.size(); ++i)
-                data.softIrqs.push_back(parts[i].toULongLong());
+                data.globalStats.softIrqs.push_back(parts[i].toULongLong());
         }
     }
-
-    return data;
 }
 
 
@@ -170,22 +151,20 @@ struct FreqEntry
 {
     qreal min;
     qreal max;
-    qreal curr;
+    qreal now;
 };
 
-std::unordered_map<quint64, FreqEntry> readFreqMinMax()
+void readFreqMinMax(Data_Cpu& data, const Mappings_t& mappings)
 {
-    std::unordered_map<quint64, FreqEntry> data;
-
     const QDir cpuDir("/sys/devices/system/cpu/");
     QStringList cpuDirs = cpuDir.entryList(QStringList() << "cpu[0-9]*", QDir::Dirs);
 
+    qsizetype i = 0;
     for (const QString& cpu : cpuDirs)
     {
         bool ok = false;
         quint64 index = cpu.mid(3).toULongLong(&ok);
-        if (!ok)
-            continue;
+        if (!ok) continue;
 
         QString basePath = cpuDir.absoluteFilePath(cpu + "/cpufreq/");
 
@@ -215,37 +194,34 @@ std::unordered_map<quint64, FreqEntry> readFreqMinMax()
             fNow.close();
         }
 
-        data[index] = FreqEntry{minFreq, maxFreq, nowFreq}; // keyed by cpu index
-    }
+        auto [cpuIndex, coreIndex] = mappings.at(i);
+        auto& core = data.cpus[cpuIndex].cores[coreIndex];
 
-    return data;
+        core.freqMin = minFreq;
+        core.freqMax = maxFreq;
+        core.freqNow = nowFreq;
+    }
 }
 
 //# Utils for /proc/loadavg
-struct LoadAvgData
+void readLoadAvg(Data_Cpu& data)
 {
-    qreal load1  = 0;
-    qreal load5  = 0;
-    qreal load15 = 0;
-};
-
-LoadAvgData readLoadAvg()
-{
-    LoadAvgData data{};
-
     QFile f("/proc/loadavg");
     if (f.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         QTextStream in(&f);
         in >> data.load1 >> data.load5 >> data.load15;
     }
-
-    return data;
 }
 
 Data_Cpu CpuCollector::collect(const Options& options)
 {
     Data_Cpu data;
+
+    const auto mappings = readCpuInfo(options, data);
+    readStat(data, mappings);
+    readFreqMinMax(data, mappings);
+    readLoadAvg(data);
 
     return data;
 }

@@ -6,14 +6,13 @@
 #include "cpu_data.h"
 #include "../enums.h"
 
-class CpuCollector
+struct CpuCollector
 {
-public:
     struct Options
     {
         const FilterMode filterMode;
         const std::unordered_set<QString> filter;
     };
 
-    Data_Cpu collect(const Options& options);
+    static Data_Cpu collect(const Options& options);
 };

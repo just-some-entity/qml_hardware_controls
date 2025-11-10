@@ -1,9 +1,11 @@
 qt_add_executable(the_test
         the_test.cpp
         ../brightness.cpp
+        ../hardware_manager.cpp
         ../collection/cpu_collector.cpp
-        ../cpu/sampler.cpp
-        ../hardware_manager.cpp)
+
+        ../samplers/cpu_sampler_simple.cpp
+)
 
 qt_add_resources(the_test "test_resources"
         PREFIX "/tests/primary"
