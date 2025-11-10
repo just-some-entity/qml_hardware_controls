@@ -43,20 +43,20 @@ A Qt/QML module to monitor and control hardware on Linux.
 | `id` | `QString` | Read-only | Unique identifier of the device. |
 
 
-### CpuDataSampler
+### CpuDataSampler (For simple monitoring tools)
 
-| Property | Type | Access | Description |
-|-----------|------|---------|-------------|
-| `name` | `string` | Read-only | Name of the CPU or logical processor (e.g., `"cpu0"`). |
-| `load1` | `qreal` | Read-only | System load average over 1 minute. |
-| `load5` | `qreal` | Read-only | System load average over 5 minutes. |
-| `load15` | `qreal` | Read-only | System load average over 15 minutes. |
-| `frequencyMin` | `qreal` | Read-only | Minimum supported CPU frequency. |
-| `frequencyMax` | `qreal` | Read-only | Maximum supported CPU frequency. |
-| `frequency` | `qreal` | Read-only | Current CPU frequency. |
-| `temperature` | `qreal` | Read-only | Current CPU temperature. |
-| `utilization` | `qreal` | Read-only | CPU utilization ratio (0–1). |
-| `powerDraw` | `qreal` | Read-only | Estimated CPU power draw in watts. |
+| Property | Type | Access | Description                                                                               |
+|-----------|------|---------|-------------------------------------------------------------------------------------------|
+| `name` | `string` | Read-only | Name of the CPU (e.g., `"Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"`). |
+| `load1` | `qreal` | Read-only | System load average over 1 minute.                                                        |
+| `load5` | `qreal` | Read-only | System load average over 5 minutes.                                                       |
+| `load15` | `qreal` | Read-only | System load average over 15 minutes.                                                      |
+| `frequencyMin` | `qreal` | Read-only | First CPU's minimum frequency.                                                            |
+| `frequencyMax` | `qreal` | Read-only | First CPU's maximum frequency.                                                            |
+| `frequency` | `qreal` | Read-only | Current CPU frequency.                                                                    |
+| `temperature` | `qreal` | Read-only | Current CPU temperature.                                                                  |
+| `utilization` | `qreal` | Read-only | CPU utilization ratio (0–1).                                                              |
+| `powerDraw` | `qreal` | Read-only | Estimated CPU power draw in watts.                                                        |
 
 ### CpuDataSnapshotModel Properties
 
